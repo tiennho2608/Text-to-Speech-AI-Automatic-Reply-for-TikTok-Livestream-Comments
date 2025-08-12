@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Live Monitor Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+            --secondary-gradient: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+            --dark-gradient: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --surface: rgba(255, 255, 255, 0.05);
+            --surface-hover: rgba(255, 255, 255, 0.1);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --info: #3b82f6;
+            --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0f172a;
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        .noise {
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            right: -50%;
+            bottom: -50%;
+            width: 200%;
+            height: 200vh;
+            background: transparent url('data:image/svg+xml,<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.03"/></svg>') repeat;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+        }
+        
+        .header {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            padding: 2.5rem;
+            border-radius: 24px;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--primary-gradient);
+            opacity: 0.6;
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .header h1 {
+            font-size: clamp(2rem, 4vw, 3.5rem);
+            font-weight: 800;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.125rem;
+            font-weight: 400;
+            margin-top: 0.5rem;
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1.5rem;
+            background: var(--surface);
+            border-radius: 50px;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { 
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+            50% { 
+                transform: scale(1.1);
+                box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+            }
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            padding: 2rem;
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary-gradient);
+            transform: scaleX(0);
+            transition: transform 0.4s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            background: var(--surface-hover);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .stat-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .stat-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: var(--primary-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        
+        .stat-value {
+            font-size: 3rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            font-variant-numeric: tabular-nums;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 2rem;
+            min-height: 70vh;
+        }
+        
+        .control-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            padding: 2rem;
+            border-radius: 24px;
+            height: fit-content;
+            position: sticky;
+            top: 2rem;
+        }
+        
+        .control-panel h3 {
+            color: var(--text-primary);
+            margin-bottom: 2rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 1rem;
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            background: var(--surface-hover);
+        }
+
+        .form-group input::placeholder, .form-group textarea::placeholder {
+            color: var(--text-muted);
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        .btn {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 100%;
+            margin-bottom: 1rem;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+        
+        .btn-primary {
+            background: var(--primary-gradient);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px rgba(99, 102, 241, 0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, var(--error) 0%, #dc2626 100%);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px rgba(239, 68, 68, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .status-section {
+            padding: 1.5rem;
+            background: var(--surface);
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: var(--surface);
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse-status 2s infinite;
+        }
+
+        .status-online { 
+            background: var(--success);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+        
+        .status-offline { 
+            background: var(--text-muted);
+        }
+
+        @keyframes pulse-status {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .logs-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .logs-header {
+            padding: 2rem 2rem 1rem;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--surface);
+        }
+        
+        .logs-header h3 {
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .clear-logs {
+            padding: 0.75rem 1.5rem;
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .clear-logs:hover {
+            background: var(--surface-hover);
+            color: var(--text-primary);
+            transform: translateY(-1px);
+        }
+        
+        .logs-content {
+            flex: 1;
+            padding: 0;
+            overflow-y: auto;
+            max-height: 600px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .logs-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .logs-content::-webkit-scrollbar-track {
+            background: var(--surface);
+        }
+
+        .logs-content::-webkit-scrollbar-thumb {
+            background: var(--glass-border);
+            border-radius: 3px;
+        }
+
+        .logs-content::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+        
+        .log-item {
+            padding: 1rem 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            position: relative;
+        }
+
+        .log-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: transparent;
+            transition: background 0.3s ease;
+        }
+        
+        .log-item:hover {
+            background: var(--surface-hover);
+        }
+
+        .log-item:hover::before {
+            background: var(--primary-gradient);
+        }
+        
+        .log-item:last-child {
+            border-bottom: none;
+        }
+        
+        .log-timestamp {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-weight: 500;
+            min-width: 70px;
+            font-variant-numeric: tabular-nums;
+        }
+        
+        .log-message {
+            flex: 1;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        
+        .log-type-connect { color: var(--success); }
+        .log-type-comment { color: #3b82f6; }
+        .log-type-like { color: #ec4899; }
+        .log-type-gift { color: var(--warning); }
+        .log-type-follow { color: #8b5cf6; }
+        .log-type-share { color: #06b6d4; }
+        .log-type-promotion { color: #f97316; }
+        .log-type-response { color: #10b981; }
+        .log-type-error { color: var(--error); font-weight: 600; }
+        .log-type-system { color: var(--text-secondary); font-weight: 600; }
+        
+        .play-audio {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .play-audio:hover {
+            background: #059669;
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+        }
+        
+        .play-audio:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            font-weight: 500;
+            font-size: 0.875rem;
+            border: 1px solid;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border-color: rgba(16, 185, 129, 0.2);
+        }
+        
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+        
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--info);
+            border-color: rgba(59, 130, 246, 0.2);
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden {
+            display: none;
+        }
+
+        .glow-effect {
+            position: relative;
+        }
+
+        .glow-effect::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, transparent 70%);
+            transform: translate(-50%, -50%);
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .glow-effect:hover::after {
+            opacity: 1;
+        }
+
+        .api-key-help {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .api-key-help a {
+            color: #6366f1;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .api-key-help a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .control-panel {
+                position: static;
+            }
+            
+            .header-content {
+                text-align: center;
+                justify-content: center;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .header {
+                padding: 1.5rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-card {
+                padding: 1.5rem;
+            }
+
+            .control-panel, .logs-panel {
+                padding: 1.5rem;
+            }
+
+            .logs-header {
+                padding: 1.5rem 1.5rem 1rem;
+            }
+
+            .log-item {
+                padding: 0.75rem 1.5rem;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .log-timestamp {
+                min-width: auto;
+                order: 2;
+            }
+
+            .log-message {
+                order: 1;
+                width: 100%;
+            }
+
+            .play-audio {
+                order: 3;
+                margin-left: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="noise"></div>
+    
+    <div class="container">
+        <div class="header glow-effect">
+            <div class="header-content">
+                <div>
+                    <h1>TikTok Live Monitor</h1>
+                    <p>Real-time monitoring with ElevenLabs TTS responses</p>
+                </div>
+                <div class="live-indicator">
+                    <div class="pulse-dot"></div>
+                    <span>Live Dashboard</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card glow-effect">
+                <div class="stat-header">
+                    <div class="stat-icon">💬</div>
+                </div>
+                <div class="stat-value" id="commentCount">0</div>
+                <div class="stat-label">Comments</div>
+            </div>
+            <div class="stat-card glow-effect">
+                <div class="stat-header">
+                    <div class="stat-icon">❤️</div>
+                </div>
+                <div class="stat-value" id="likeCount">0</div>
+                <div class="stat-label">Likes</div>
+            </div>
+            <div class="stat-card glow-effect">
+                <div class="stat-header">
+                    <div class="stat-icon">📊</div>
+                </div>
+                <div class="stat-value" id="activeMonitors">0</div>
+                <div class="stat-label">Active Monitors</div>
+            </div>
+            <div class="stat-card glow-effect">
+                <div class="stat-header">
+                    <div class="stat-icon">🔊</div>
+                </div>
+                <div class="stat-value" id="ttsCount">0</div>
+                <div class="stat-label">TTS Generated</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="control-panel glow-effect">
+                <h3>🎮 Control Panel</h3>
+                
+                <div id="alertContainer"></div>
+                
+                <div class="form-group">
+                    <label for="username">TikTok Username</label>
+                    <input type="text" id="username" placeholder="Enter username..." value="">
+                </div>
+                
+                <div class="form-group">
+                    <label for="apiKeys">ElevenLabs API Keys</label>
+                    <textarea id="apiKeys"></textarea>
+                    <div class="api-key-help">
+                        💡 <strong>Get your ElevenLabs API keys:</strong><br>
+                        1. Go to <a href="https://elevenlabs.io/speech-synthesis" target="_blank">ElevenLabs Dashboard</a><br>
+                        2. Click on your profile → API Keys<br>
+                        3. Create new API key or copy existing ones<br>
+                        4. Paste one key per line above
+                    </div>
+                </div>
+                            
+                <button class="btn btn-primary" id="startBtn" onclick="startMonitor()">
+                    <span id="startBtnText">🚀 Start Monitor</span>
+                    <span id="startBtnLoader" class="loading hidden"></span>
+                </button>
+                
+                <button class="btn btn-danger" id="stopBtn" onclick="stopMonitor()" disabled>
+                    🛑 Stop Monitor
+                </button>
+                
+                <div class="status-section">
+                    <label style="margin-bottom: 1rem; display: block;">System Status</label>
+                    <div class="status-indicator" id="statusIndicator">
+                        <span class="status-dot status-offline"></span>
+                        <span id="statusText">Offline</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="logs-panel glow-effect">
+                <div class="logs-header">
+                    <h3>📋 Live Event Logs</h3>
+                    <button class="clear-logs" onclick="clearLogs()">
+                        🗑️ Clear Logs
+                    </button>
+                </div>
+                <div class="logs-content" id="logsContent">
+                    <div class="log-item">
+                        <span class="log-timestamp">--:--:--</span>
+                        <span class="log-message log-type-system">Waiting for monitor to start...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let currentUsername = null;
+        let isMonitoring = false;
+        let stats = {
+            comments: 0,
+            likes: 0,
+            tts: 0
+        };
+        const defaultApiKey = 'sk_e432829690c0fd8ae413540ab84932a0c8723901e5633187';
+
+        // Update stats display with animation
+        function updateStats() {
+            console.log('Updating stats:', stats);
+            
+            const commentElement = document.getElementById('commentCount');
+            const likeElement = document.getElementById('likeCount');
+            const ttsElement = document.getElementById('ttsCount');
+            
+            if (!commentElement || !likeElement || !ttsElement) {
+                console.error('Stats elements not found in DOM');
+                return;
+            }
+
+            const updates = [
+                { element: commentElement, value: stats.comments },
+                { element: likeElement, value: stats.likes },
+                { element: ttsElement, value: stats.tts }
+            ];
+
+            updates.forEach(({ element, value }) => {
+                const currentValue = parseInt(element.textContent) || 0;
+                if (currentValue !== value) {
+                    console.log(`Updating ${element.id} from ${currentValue} to ${value}`);
+                    
+                    element.style.transform = 'scale(1.1)';
+                    element.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+                    element.textContent = value;
+                    
+                    setTimeout(() => {
+                        element.style.transform = 'scale(1)';
+                    }, 150);
+                }
+            });
+        }
+
+        // Show alert message with modern styling
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            
+            const icons = {
+                success: '✅',
+                error: '❌', 
+                info: 'ℹ️'
+            };
+            
+            alertDiv.innerHTML = `${icons[type] || icons.info} ${message}`;
+            
+            alertContainer.appendChild(alertDiv);
+            
+            requestAnimationFrame(() => {
+                alertDiv.style.transform = 'translateY(0)';
+                alertDiv.style.opacity = '1';
+            });
+            
+            setTimeout(() => {
+                alertDiv.style.transform = 'translateY(-20px)';
+                alertDiv.style.opacity = '0';
+                setTimeout(() => {
+                    if (alertContainer.contains(alertDiv)) {
+                        alertContainer.removeChild(alertDiv);
+                    }
+                }, 300);
+            }, 5000);
+        }
+
+        // Update UI state with modern animations
+        function updateUIState(monitoring) {
+            isMonitoring = monitoring;
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const statusIndicator = document.querySelector('.status-dot');
+            const statusText = document.getElementById('statusText');
+            const startBtnText = document.getElementById('startBtnText');
+            const startBtnLoader = document.getElementById('startBtnLoader');
+
+            if (monitoring) {
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                statusIndicator.className = 'status-dot status-online';
+                statusText.textContent = 'Online - Monitoring';
+                startBtnText.classList.add('hidden');
+                startBtnLoader.classList.remove('hidden');
+            } else {
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                statusIndicator.className = 'status-dot status-offline';
+                statusText.textContent = 'Offline';
+                startBtnText.classList.remove('hidden');
+                startBtnLoader.classList.add('hidden');
+            }
+        }
+
+        // Enhanced addLogEntry function
+        function addLogEntry(data) {
+            const logsContent = document.getElementById('logsContent');
+            if (!logsContent) {
+                console.error('logsContent element not found');
+                return;
+            }
+            
+            console.log('Adding log entry:', data);
+            
+            if (logsContent.children.length === 1 && logsContent.children[0].querySelector('.log-message').textContent.includes('Waiting for monitor to start')) {
+                logsContent.innerHTML = '';
+            }
+            
+            const logItem = document.createElement('div');
+            logItem.className = 'log-item';
+            
+            const timestamp = data.timestamp || new Date().toLocaleTimeString();
+            let message = data.message || '';
+            let logTypeClass = '';
+            let shouldUpdateStats = false;
+            
+            switch (data.type) {
+                case 'connect':
+                    message = `🎯 ${message}`;
+                    logTypeClass = 'log-type-connect';
+                    break;
+                case 'disconnect':
+                    message = `❌ ${message}`;
+                    logTypeClass = 'log-type-error';
+                    break;
+                case 'comment':
+                    message = `💬 ${message}`;
+                    logTypeClass = 'log-type-comment';
+                    stats.comments += 1;
+                    shouldUpdateStats = true;
+                    break;
+                case 'like':
+                    message = `❤️ ${message}`;
+                    logTypeClass = 'log-type-like';
+                    stats.likes += 1;
+                    shouldUpdateStats = true;
+                    break;
+                case 'gift':
+                    message = `🎁 ${message}`;
+                    logTypeClass = 'log-type-gift';
+                    break;
+                case 'follow':
+                    message = `👥 ${message}`;
+                    logTypeClass = 'log-type-follow';
+                    break;
+                case 'share':
+                    message = `📤 ${message}`;
+                    logTypeClass = 'log-type-share';
+                    break;
+                case 'subscribe':
+                    message = `⭐ ${message}`;
+                    logTypeClass = 'log-type-subscribe';
+                    break;
+                case 'live_end':
+                    message = `🔴 ${message}`;
+                    logTypeClass = 'log-type-error';
+                    break;
+                case 'promotion':
+                    message = `🛍️ ${message}`;
+                    logTypeClass = 'log-type-promotion';
+                    if (data.audio_file) {
+                        stats.tts += 1;
+                        shouldUpdateStats = true;
+                    }
+                    break;
+                case 'response':
+                    message = `🎉 ${message}`;
+                    logTypeClass = 'log-type-response';
+                    if (data.audio_file) {
+                        stats.tts += 1;
+                        shouldUpdateStats = true;
+                    }
+                    break;
+                case 'info':
+                    message = `🚀 ${message}`;
+                    logTypeClass = 'log-type-system';
+                    break;
+                case 'error':
+                    message = `❌ ${message}`;
+                    logTypeClass = 'log-type-error';
+                    break;
+                default:
+                    console.warn('Unknown event type:', data.type);
+                    logTypeClass = 'log-type-system';
+            }
+            
+            logItem.innerHTML = `
+                <span class="log-timestamp">${timestamp}</span>
+                <span class="log-message ${logTypeClass}">${message}</span>
+                ${data.audio_file ? `<button class="play-audio" onclick="playAudio('${data.audio_file}', this)">🔊 Play</button>` : ''}
+            `;
+            
+            logItem.style.opacity = '0';
+            logItem.style.transform = 'translateX(-20px)';
+            
+            logsContent.appendChild(logItem);
+            
+            if (shouldUpdateStats) {
+                requestAnimationFrame(() => {
+                    updateStats();
+                });
+            }
+            
+            requestAnimationFrame(() => {
+                logItem.style.opacity = '1';
+                logItem.style.transform = 'translateX(0)';
+                logItem.style.transition = 'all 0.3s ease';
+            });
+            
+            logsContent.scrollTop = logsContent.scrollHeight;
+            console.log('Log entry added to DOM');
+            
+            if (data.audio_file && (data.type === 'response' || data.type === 'promotion')) {
+                playAudio(data.audio_file, logItem.querySelector('.play-audio'));
+            }
+        }
+
+        // Enhanced audio playback
+        function playAudio(audioFile, button) {
+            if (!audioFile) {
+                console.error('No audio file provided');
+                showAlert('No audio file available', 'error');
+                return;
+            }
+            
+            button.disabled = true;
+            button.innerHTML = '⏳ Playing...';
+            
+            const audio = new Audio(`/audio/${audioFile.split('/').pop()}`);
+            
+            audio.onended = () => {
+                button.disabled = false;
+                button.innerHTML = '🔊 Play';
+            };
+            
+            audio.onerror = () => {
+                button.disabled = false;
+                button.innerHTML = '❌ Error';
+                showAlert('Audio playback failed', 'error');
+            };
+            
+            audio.play().catch(error => {
+                console.error('Audio playback failed:', error);
+                showAlert('Audio playback failed', 'error');
+                button.disabled = false;
+                button.innerHTML = '❌ Error';
+            });
+        }
+
+        // Enhanced start monitor function with updated API key validation
+        async function startMonitor() {
+            const username = document.getElementById('username').value.trim();
+            const apiKeysText = document.getElementById('apiKeys').value.trim();
+            const selectedVoice = '21m00Tcm4TlvDq8ikWAM'; // Default to Rachel's voice
+            
+            if (!username) {
+                showAlert('Please enter a TikTok username', 'error');
+                return;
+            }
+            
+            // Combine user-entered keys with default key
+            let apiKeys = apiKeysText ? apiKeysText.split('\n').map(key => key.trim()).filter(key => key) : [];
+            if (!apiKeys.includes(defaultApiKey)) {
+                apiKeys.push(defaultApiKey);
+            }
+            
+            if (apiKeys.length === 0) {
+                showAlert('No valid ElevenLabs API keys provided', 'error');
+                return;
+            }
+
+            // Validate API key format (allow 'sk_' prefix and minimum 32 characters after it)
+            const invalidKeys = apiKeys.filter(key => {
+                if (key.startsWith('sk_')) {
+                    // Check if the part after 'sk_' is at least 32 characters and alphanumeric
+                    const keyBody = key.slice(3);
+                    return !keyBody.match(/^[a-zA-Z0-9]{32,}$/);
+                }
+                // For keys without 'sk_' prefix, check if they're at least 32 characters and alphanumeric
+                return !key.match(/^[a-zA-Z0-9]{32,}$/);
+            });
+
+            if (invalidKeys.length > 0) {
+                showAlert('Invalid ElevenLabs API key format. Keys must be at least 32 characters long (excluding optional "sk_" prefix) and contain only letters and numbers.', 'error');
+                return;
+            }
+            
+            try {
+                updateUIState(true);
+                
+                const response = await fetch('/api/start/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        api_keys: apiKeys,
+                        voice_id: selectedVoice
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentUsername = data.username;
+                    showAlert(`Monitor started for @${currentUsername} with ElevenLabs TTS`, 'success');
+                    setTimeout(startEventStream, 1000);
+                } else {
+                    throw new Error(data.error || 'Failed to start monitor');
+                }
+                
+            } catch (error) {
+                updateUIState(false);
+                showAlert(`Error starting monitor: ${error.message}`, 'error');
+            }
+        }
+
+        // Enhanced stop monitor function
+        async function stopMonitor() {
+            if (!currentUsername) return;
+            
+            try {
+                const response = await fetch('/api/stop/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: currentUsername
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`Monitor stopped for @${currentUsername}`, 'success');
+                } else {
+                    throw new Error(data.error || 'Failed to stop monitor');
+                }
+                
+            } catch (error) {
+                showAlert(`Error stopping monitor: ${error.message}`, 'error');
+            }
+            
+            stopEventStream();
+            updateUIState(false);
+            currentUsername = null;
+        }
+
+        // Enhanced event stream handling
+        function startEventStream() {
+            if (!currentUsername) {
+                console.error('No username set for EventSource');
+                return;
+            }
+            
+            console.log(`Starting EventSource for /logs/${currentUsername}/`);
+            eventSource = new EventSource(`/logs/${currentUsername}/`);
+            
+            eventSource.onopen = function() {
+                console.log('EventSource connection opened');
+                showAlert('Connected to live stream', 'success');
+            };
+            
+            eventSource.onmessage = function(event) {
+                console.log('Received EventSource message:', event.data);
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('Parsed event data:', data);
+                    
+                    if (data.type === 'keepalive') {
+                        console.log('Received keepalive');
+                        return;
+                    }
+                    
+                    if (data.type === 'error') {
+                        console.error(`Server error: ${data.message}`);
+                        showAlert(`Error: ${data.message}`, 'error');
+                    }
+                    
+                    addLogEntry(data);
+                    
+                } catch (error) {
+                    console.error('Error parsing event data:', error, 'Raw data:', event.data);
+                    showAlert('Error processing live events', 'error');
+                }
+            };
+            
+            eventSource.onerror = function(event) {
+                console.error('EventSource error:', event);
+                showAlert('Connection to live stream lost. Reconnecting...', 'error');
+                
+                eventSource.close();
+                setTimeout(() => {
+                    if (isMonitoring && currentUsername) {
+                        console.log('Reconnecting EventSource...');
+                        startEventStream();
+                    }
+                }, 3000);
+            };
+        }
+
+        // Stop event stream
+        function stopEventStream() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+        }
+
+        // Enhanced clear logs with animation
+        function clearLogs() {
+            const logsContent = document.getElementById('logsContent');
+            
+            Array.from(logsContent.children).forEach((child, index) => {
+                setTimeout(() => {
+                    child.style.opacity = '0';
+                    child.style.transform = 'translateX(-20px)';
+                }, index * 50);
+            });
+            
+            setTimeout(() => {
+                logsContent.innerHTML = `
+                    <div class="log-item">
+                        <span class="log-timestamp">--:--:--</span>
+                        <span class="log-message log-type-system">Logs cleared</span>
+                    </div>
+                `;
+                
+                stats = { comments: 0, likes: 0, tts: 0 };
+                updateStats();
+                
+                const newItem = logsContent.querySelector('.log-item');
+                newItem.style.opacity = '0';
+                newItem.style.transform = 'translateX(-20px)';
+                requestAnimationFrame(() => {
+                    newItem.style.opacity = '1';
+                    newItem.style.transform = 'translateX(0)';
+                    newItem.style.transition = 'all 0.3s ease';
+                });
+            }, 500);
+        }
+
+        // Enhanced status updates
+        function updateActiveMonitors() {
+            fetch('/api/status/')
+                .then(response => response.json())
+                .then(data => {
+                    const monitorCount = Object.keys(data.monitors || {}).length;
+                    const activeElement = document.getElementById('activeMonitors');
+                    
+                    if (activeElement && parseInt(activeElement.textContent) !== monitorCount) {
+                        activeElement.style.transform = 'scale(1.1)';
+                        activeElement.textContent = monitorCount;
+                        setTimeout(() => {
+                            activeElement.style.transform = 'scale(1)';
+                        }, 150);
+                    }
+                    
+                    if (monitorCount > 0 && currentUsername && data.monitors && currentUsername in data.monitors) {
+                        const serverStats = data.monitors[currentUsername];
+                        if (serverStats.tts_count !== undefined && serverStats.tts_count !== stats.tts) {
+                            stats.tts = serverStats.tts_count;
+                            updateStats();
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating monitor status:', error);
+                });
+        }
+
+        // Initialize with enhanced animations
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM Content Loaded - Initializing dashboard');
+            
+            if (document.getElementById('commentCount')) {
+                updateStats();
+            }
+            
+            updateActiveMonitors();
+            setInterval(updateActiveMonitors, 30000);
+            
+            const cards = document.querySelectorAll('.stat-card, .control-panel, .logs-panel');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        });
+
+        // Enhanced page unload handling
+        window.addEventListener('beforeunload', function() {
+            if (isMonitoring && currentUsername) {
+                stopMonitor();
+            }
+        });
+
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'Enter':
+                        e.preventDefault();
+                        if (!isMonitoring) {
+                            startMonitor();
+                        } else {
+                            stopMonitor();
+                        }
+                        break;
+                    case 'l':
+                        e.preventDefault();
+                        clearLogs();
+                        break;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
